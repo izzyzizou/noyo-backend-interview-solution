@@ -1,4 +1,5 @@
 import logging
+import time
 
 from datetime import datetime, timedelta
 
@@ -38,9 +39,8 @@ def get_address(args, person_id):
         abort(404, description="person does not exist")
     elif len(person.address_segments) == 0:
         abort(404, description="person does not have an address, please create one")
-
-    address_segment = person.address_segments[-1]
-    return jsonify(AddressSchema().dump(address_segment))
+    address_segment = AddressSegment.query.filter_by(person_id=person_id).all()
+    return jsonify(AddressSchema(many=True).dump(address_segment))
 
 
 @app.route("/api/persons/<uuid:person_id>/address", methods=["PUT"])
@@ -61,7 +61,6 @@ def create_address(payload, person_id):
             start_date=payload.get("start_date"),
             person_id=person_id,
         )
-
         db.session.add(address_segment)
         db.session.commit()
         db.session.refresh(address_segment)
@@ -71,6 +70,24 @@ def create_address(payload, person_id):
         # that begins on the start_date provided in the API request and continues
         # into the future. If the start_date provided is not greater than most recent
         # address segment start_date, raise an Exception.
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        start_date = payload.get("start_date")
+        get_previous_address = AddressSegment.query.filter_by(end_date=None,
+                                                              person_id=person_id).first()
+        get_previous_address.end_date = start_date
+        if start_date < get_previous_address.start_date:
+            raise Exception("New address start date must be after previous address start date")
+        address_segment = AddressSegment(
+            street_one=payload.get("street_one"),
+            street_two=payload.get("street_two"),
+            city=payload.get("city"),
+            state=payload.get("state"),
+            zip_code=payload.get("zip_code"),
+            start_date=payload.get("start_date"),
+            person_id=person_id
+        )
+        db.session.add(address_segment)
+        db.session.commit()
+        db.session.refresh(address_segment)
 
     return jsonify(AddressSchema().dump(address_segment))
