@@ -75,7 +75,7 @@ def create_address(payload, person_id):
         get_previous_address = AddressSegment.query.filter_by(end_date=None,
                                                               person_id=person_id).first()
         get_previous_address.end_date = start_date
-        if start_date < get_previous_address.start_date:
+        if start_date <= get_previous_address.start_date:
             raise Exception("New address start date must be after previous address start date")
         address_segment = AddressSegment(
             street_one=payload.get("street_one"),
