@@ -12,6 +12,8 @@ from service.server import app, db
 from service.models import AddressSegment
 from service.models import Person
 
+from sqlalchemy import desc, or_
+
 
 class GetAddressQueryArgsSchema(Schema):
     date = fields.Date(required=False, missing=datetime.utcnow().date())
@@ -39,8 +41,17 @@ def get_address(args, person_id):
         abort(404, description="person does not exist")
     elif len(person.address_segments) == 0:
         abort(404, description="person does not have an address, please create one")
-    address_segment = AddressSegment.query.filter_by(person_id=person_id).all()
-    return jsonify(AddressSchema(many=True).dump(address_segment))
+    # address_segment = AddressSegment.query.filter_by(person_id=person_id).all()
+    qs = args["date"]
+    address_segment = AddressSegment.query.filter(AddressSegment.start_date <= qs,
+                                                  or_(qs <= AddressSegment.end_date,
+                                                      AddressSegment.end_date == None)).order_by(
+        desc(AddressSegment.start_date)).first()
+    app.logger.info(f"ADDRESS DATA {address_segment}")
+    if address_segment is None:
+        # address_segment = person.address_segments[-1]
+        abort(404, description=f"Address with {args['date']} start date is not found.")
+    return jsonify(AddressSchema().dump(address_segment))
 
 
 @app.route("/api/persons/<uuid:person_id>/address", methods=["PUT"])
